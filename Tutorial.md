@@ -6,6 +6,7 @@ Create requirements.txt, .gitignore, Tutorial.md, .env
 
 1. Create <a href="#dockerfile">Dockerfile</a>
 2. Create <a href="#docker_compose">docker-compose</a>
+3. Create <a href="#postgres">Postgres/a>
 
 ---
 
@@ -73,5 +74,89 @@ docker-compose build
 ```
 docker-compose up
 ```
+
+---
+
+### 3. Create Postgres: <a name="postgres"></a>
+
+[postgres:14.6-alpine](https://hub.docker.com/_/postgres)
+
+1. docker-compose.yml
+
+    ```dockerfile
+    services:
+      web-app:
+        .....
+          
+        environment:
+          - DB_HOST=database  # вот тут указываем ссылку на другой сервис докеркомпоза
+          - DB_NAME=dbname
+          - DB_USER=dbuser
+          - DB_PASS=pass
+    
+        .....
+    
+        depends_on:  эта директива означает что мы не должны запускать web-app раньше, чем мы запустили сервис database
+          - database
+    
+      database:
+       image: postgres:14.6-alpine
+       environment:  # конфигурируем пользователя и при билде он сам создастся
+         - POSTGRES_DB=dbname
+         - POSTGRES_USER=dbuser
+         - POSTGRES_PASSWORD=pass
+    
+    ```
+2. settings.py
+
+    ```
+    import os
+    
+    ...
+    
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'HOST': os.environ.get('DB_HOST'),
+            'NAME': os.environ.get('DB_NAME'),
+            'USER': os.environ.get('DB_USER'),
+            'PASSWORD': os.environ.get('DB_PASS'),
+        }
+    }
+    ```
+
+3. Dockerfile
+   ```dockerfile
+   ...
+   RUN apk add postgresql-client build-base postgresql-dev
+   ...
+   ```
+
+4. build, migrate, createsuperuser
+   ```
+   docker-compose build
+   ```
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py migrate"
+   ```
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py createsuperuser"
+   ```
+
+   ```
+   docker-compose up
+   ```
+
+Если возникает ошибка в отсутствие psycopg2, копирования кода нужно поставить после скачивания пакетов requirements
+
+   ```dockerfile
+   COPY requirements.txt /temp/requirements.txt
+   COPY service /service
+   ```
+
+---
+
+
+
 
 <a href="#top">UP</a>
