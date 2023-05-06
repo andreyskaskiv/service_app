@@ -353,4 +353,20 @@ docker-compose up
        serializer_class = SubscriptionSerializer
    ```
 
+4. Added PlanSerializer:
+   ```
+   services -> serializers.py
+   
+   class PlanSerializer(serializers.ModelSerializer)
+   ```
+
+   ```
+   PlanSerializer
+   ...
+   SubscriptionSerializer(serializers.ModelSerializer)
+   plan = PlanSerializer()
+   
+      fields = (...., 'plan')
+   ```
+
 <a href="#top">UP</a>
