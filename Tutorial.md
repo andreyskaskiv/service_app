@@ -383,4 +383,18 @@ docker-compose up
       serializer_class = SubscriptionSerializer
    ```
 
+6. Create test_api:  
+   Testing optimization with prefetch_related and select_related
+
+   ```
+   services/tests -> test_api.py
+    
+   class ServicesApiTestCase(TestCase):
+      ...
+   ```
+
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py test"
+   ```
+
 <a href="#top">UP</a>
