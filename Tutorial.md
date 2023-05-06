@@ -9,6 +9,7 @@ Create requirements.txt, .gitignore, Tutorial.md, .env
 3. Create <a href="#postgres">Postgres/a>
 4. Create app <a href="#clients">clients/a>
 5. Create app <a href="#services">services/a>
+6. ORM query <a href="#optimization">optimization/a>
 
 ---
 
@@ -297,6 +298,59 @@ docker-compose up
    "email": "andrey@gmail.com"
    }
    ]
+   ```
+
+---
+
+### 6. ORM query optimization: <a name="optimization"></a>
+
+* Проверить, какие существуют N+1 запросы.
+* Определить, какие поля нам реально нужно брать из базы, убрать все лишнее.
+* В Unit-test можно сразу закрепить сколько данный api-endpoint делает запросов.
+* Запросы с JOIN-ами тяжелея, чем обычные, но предпочтительней чем N+1.
+* Возможно, стоит пересмотреть и сами модели, которые мы создаем в ДБ.
+
+Разница между select_related и prefetch_related что один для one to one, второй one to many.
+
+1. Added LOGGING:
+   ```
+   service -> settings.py
+   
+   LOGGING = {
+    'version': 1,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler'}
+    },
+    'loggers': {
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'DEBUG' # here we choose what we will log
+        }
+    }
+   }
+   ```
+2. Run docker and api:
+   ```
+   cd PycharmProjects/Django_optimization/service_app
+   ```
+
+   ```
+   docker-compose up
+   ```
+
+   [&#8658; json ](http://127.0.0.1:8000/api/subscriptions/?format=json)
+
+3. views refactoring::
+   ```
+   services -> views.py 
+   
+   class SubscriptionView(ReadOnlyModelViewSet):
+       queryset = Subscription.objects.all().prefetch_related(
+           Prefetch('client',
+                    queryset=Client.objects.all().select_related('user').only('company_name',
+                                                                              'user__email'))
+       )
+       serializer_class = SubscriptionSerializer
    ```
 
 <a href="#top">UP</a>
