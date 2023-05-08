@@ -6,10 +6,11 @@ Create requirements.txt, .gitignore, Tutorial.md, .env
 
 1. Create <a href="#dockerfile">Dockerfile</a>
 2. Create <a href="#docker_compose">docker-compose</a>
-3. Create <a href="#postgres">Postgres/a>
-4. Create app <a href="#clients">clients/a>
-5. Create app <a href="#services">services/a>
-6. ORM query <a href="#optimization">optimization/a>
+3. Create <a href="#postgres">Postgres</a>
+4. Create app <a href="#clients">clients</a>
+5. Create app <a href="#services">services</a>
+6. ORM query <a href="#optimization">optimization</a>
+7. Annotate and Aggregate in <a href="#orm">ORM</a>
 
 ---
 
@@ -408,6 +409,62 @@ docker-compose up
 
    ```
    docker-compose run --rm web-app sh -c "python manage.py test"
+   ```
+
+---
+
+### 7. Annotate and Aggregate in ORM: <a name="orm"></a>
+
+1. Added get_price:  
+   Данную логику можно реализовать и в модели, но для примера реализуем в сериализаторе.
+   instance в функции get_price - это конкретная модель подписки. API-endpoint у нас создает все подписки,
+   а функция запускается для каждой подписки. instance == subscription.
+   Данный способ создает проблему N+1, можно решить это и с помощью "Prefetch",
+   но мы решим это на уровне базы в следующем пункте.
+
+   ```
+   services -> serializers.py
+   
+   class SubscriptionSerializer(serializers.ModelSerializer):
+      ...
+      price = serializers.SerializerMethodField()
+      
+      def get_price(self, instance):
+        return (instance.service.full_price -
+                instance.service.full_price * (instance.plan.discount_percent / 100))
+   
+   
+      fields = (...., 'price')
+   ```
+
+   ```json
+   [
+     {
+       "id": 1,
+       "plan_id": 3,
+       "client_name": "Company First",
+       "email": "andrey@gmail.com",
+       "plan": {
+         "id": 3,
+         "plan_type": "discount",
+         "discount_percent": 5
+       },
+       "price": 237.5
+     },
+     {
+       "id": 2,
+       "plan_id": 2,
+       "client_name": "Company Second",
+       "email": "Test_users@mail.com",
+       "plan": {
+         "id": 2,
+         "plan_type": "student",
+         "discount_percent": 20
+       },
+       "price": 200
+     }
+   ]
+   
    ```
 
 <a href="#top">UP</a>
