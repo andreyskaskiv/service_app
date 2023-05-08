@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import connection
-from django.db.models import Prefetch
+from django.db.models import Prefetch, F
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
@@ -66,7 +66,9 @@ class ServicesApiTestCase(APITestCase):
             Prefetch('client',
                      queryset=Client.objects.all().select_related('user').only('company_name',
                                                                                'user__email'))
-        )
+        ).annotate(price=F('service__full_price') -
+                         F('service__full_price') * F('plan__discount_percent') / 100.00)
+
         serializer_data = SubscriptionSerializer(queryset, many=True).data
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.assertEqual(serializer_data, response.data)

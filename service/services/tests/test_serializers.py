@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.db.models import Prefetch
+from django.db.models import Prefetch, F
 from django.test import TestCase
 
 from clients.models import Client
@@ -51,7 +51,8 @@ class ServicesSerializerTestCase(TestCase):
             Prefetch('client',
                      queryset=Client.objects.all().select_related('user').only('company_name',
                                                                                'user__email'))
-        )
+        ).annotate(price=F('service__full_price') -
+                         F('service__full_price') * F('plan__discount_percent') / 100.00)
 
         data = SubscriptionSerializer(queryset, many=True).data
         expected_data = [
@@ -64,8 +65,10 @@ class ServicesSerializerTestCase(TestCase):
                     "id": self.plan_1.id,
                     "plan_type": "Full",
                     "discount_percent": 0
-                }
+                },
+                "price": 250
             },
+
             {
                 "id": self.client_2.id,
                 "plan_id": self.plan_2.id,
@@ -75,7 +78,8 @@ class ServicesSerializerTestCase(TestCase):
                     "id": self.plan_2.id,
                     "plan_type": "Discount",
                     "discount_percent": 20
-                }
+                },
+                "price": 200
             },
             {
                 "id": self.client_3.id,
@@ -86,7 +90,8 @@ class ServicesSerializerTestCase(TestCase):
                     "id": self.plan_3.id,
                     "plan_type": "Student",
                     "discount_percent": 40
-                }
+                },
+                "price": 150
             }
         ]
 

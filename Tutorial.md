@@ -467,4 +467,123 @@ docker-compose up
    
    ```
 
+2. Annotate:
+
+   annotate - каждую из выдаваемых subscription он бедет чем-то дополнять, как-то анотировать.
+   Добавиться вируальное поле price.
+
+   ```
+   services -> views.py 
+   
+   class SubscriptionView(ReadOnlyModelViewSet):
+      queryset = Subscription.objects.all().prefetch_related(
+        'plan',
+        Prefetch('client',
+        queryset=Client.objects.all().select_related('user').only('company_name',
+                                                               'user__email'))
+        ).annotate(price=F('service__full_price') -
+                         F('service__full_price') * F('plan__discount_percent') / 100.00)
+    serializer_class = SubscriptionSerializer
+   ```
+
+3. serializers refactoring:
+
+   ```
+   services -> serializers.py 
+   
+   class SubscriptionSerializer(serializers.ModelSerializer):
+      ...
+      
+      def get_price(self, instance):
+         return instance.price
+   ```
+
+   ```json
+   [
+     {
+       "id": 1,
+       "plan_id": 3,
+       "client_name": "Company First",
+       "email": "andrey@gmail.com",
+       "plan": {
+         "id": 3,
+         "plan_type": "discount",
+         "discount_percent": 5
+       },
+       "price": 237.5
+     },
+     {
+       "id": 2,
+       "plan_id": 2,
+       "client_name": "Company Second",
+       "email": "Test_users@mail.com",
+       "plan": {
+         "id": 2,
+         "plan_type": "student",
+         "discount_percent": 20
+       },
+       "price": 200
+     }
+   ]
+   
+   ```
+
+4. test_api refactoring:
+
+   ```
+   services/tests -> test_api.py
+    
+   class ServicesApiTestCase(TestCase):
+      ...
+   
+      queryset = Subscription.objects.all().prefetch_related(
+            'plan',
+            Prefetch('client',
+                     queryset=Client.objects.all().select_related('user').only('company_name',
+                                                                               'user__email'))
+        ).annotate(price=F('service__full_price') -
+                         F('service__full_price') * F('plan__discount_percent') / 100.00)
+   ```
+
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py test"
+   ```
+
+5. test_serializers refactoring:
+
+   ```
+   services/tests -> test_serializers.py
+    
+   class ServicesSerializerTestCase(TestCase):
+      ...
+   
+      queryset = Subscription.objects.all().prefetch_related(
+            'plan',
+            Prefetch('client',
+                     queryset=Client.objects.all().select_related('user').only('company_name',
+                                                                               'user__email'))
+        ).annotate(price=F('service__full_price') -
+                         F('service__full_price') * F('plan__discount_percent') / 100.00)
+   
+       expected_data = [
+            {
+                "id": self.client_1.id,
+                "plan_id": self.plan_1.id,
+                "client_name": "company_name_test_1",
+                "email": "andrey@gmail.com",
+                "plan": {
+                    "id": self.plan_1.id,
+                    "plan_type": "Full",
+                    "discount_percent": 0
+                },
+                "price": 250
+            },
+            ...
+        ]
+   ```
+
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py test"
+   ```
+
 <a href="#top">UP</a>
