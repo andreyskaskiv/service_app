@@ -59,7 +59,7 @@ class ServicesApiTestCase(APITestCase):
             response = self.client.get(url)
             # print(f"len =====>>>>> {len(queries)}")
             # print(f"list =====>>>>> {list(queries)}")
-            self.assertEqual(3, len(queries))
+            self.assertEqual(4, len(queries))
 
         queryset = Subscription.objects.all().prefetch_related(
             'plan',
@@ -71,7 +71,7 @@ class ServicesApiTestCase(APITestCase):
 
         serializer_data = SubscriptionSerializer(queryset, many=True).data
         self.assertEqual(status.HTTP_200_OK, response.status_code)
-        self.assertEqual(serializer_data, response.data)
+        self.assertEqual(serializer_data, response.data['result'])
         self.assertEqual(serializer_data[0]['plan']['plan_type'], 'Full')
         self.assertEqual(serializer_data[1]['plan']['plan_type'], 'Discount')
         self.assertEqual(serializer_data[2]['plan']['plan_type'], 'Student')

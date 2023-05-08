@@ -586,4 +586,78 @@ docker-compose up
    docker-compose run --rm web-app sh -c "python manage.py test"
    ```
 
+6. Aggregate:  
+   Api 2.0
+
+   "queryset.aggregate(total=Sum('price')).get('total')" сработал, так как мы в annotate создали виртуальное
+   поле price.
+
+   ```
+   services -> views.py 
+   
+   class SubscriptionView(ReadOnlyModelViewSet):
+      ...
+      def list(self, request, *args, **kwargs):
+         queryset = self.filter_queryset(self.get_queryset())
+         response = super().list(request, *args, **kwargs)
+         
+         response_data = {'result': response.data}
+         response_data['total_amount'] = queryset.aggregate(total=Sum('price')).get('total')
+         response.data = response_data
+         
+         return response
+   ```
+
+   ```json
+   {
+     "result": [
+       {
+         "id": 1,
+         "plan_id": 3,
+         "client_name": "Company First",
+         "email": "andrey@gmail.com",
+         "plan": {
+           "id": 3,
+           "plan_type": "discount",
+           "discount_percent": 5
+         },
+         "price": 237.5
+       },
+       {
+         "id": 2,
+         "plan_id": 2,
+         "client_name": "Company Second",
+         "email": "Test_users@mail.com",
+         "plan": {
+           "id": 2,
+           "plan_type": "student",
+           "discount_percent": 20
+         },
+         "price": 200
+       }
+     ],
+     "total_amount": 437.5
+   }
+   ```
+
+7. test_api refactoring:  
+   Aggregate добавляет еще один запрос в базу
+
+   ```
+   class ServicesApiTestCase(APITestCase):
+       def test_01_get(self):
+           ...
+   
+           with CaptureQueriesContext(connection) as queries:
+                ...
+               self.assertEqual(4, len(queries))
+   
+      ...
+      self.assertEqual(serializer_data, response.data['result'])
+   ```
+
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py test"
+   ```
+
 <a href="#top">UP</a>

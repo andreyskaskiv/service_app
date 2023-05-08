@@ -68,7 +68,6 @@ class ServicesSerializerTestCase(TestCase):
                 },
                 "price": 250
             },
-
             {
                 "id": self.client_2.id,
                 "plan_id": self.plan_2.id,
