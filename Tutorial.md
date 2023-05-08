@@ -397,4 +397,17 @@ docker-compose up
    docker-compose run --rm web-app sh -c "python manage.py test"
    ```
 
+7. Create test_serializers:
+
+   ```
+   services/tests -> test_serializers.py
+    
+   class ServicesSerializerTestCase(TestCase):
+      ...
+   ```
+
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py test"
+   ```
+
 <a href="#top">UP</a>
