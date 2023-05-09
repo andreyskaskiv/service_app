@@ -237,7 +237,7 @@ docker-compose up
 
    ```text
    client = models.ForeignKey(Client, related_name='subscriptions', on_delete=models.PROTECT)
-   related_name - это то, с каким именем будет доступна создаваемая модель с которой мы образуем связь.
+   related_name - это то, с каким именем будет доступна создаваемая модель с которой мы образуем связь(Client).
    Чтобы показать подписки клиента - Client.subscriptions.all() или Subscription.filter(client=client_id).all()
    ```
 
@@ -340,8 +340,18 @@ docker-compose up
    ```
 
    [&#8658; json ](http://127.0.0.1:8000/api/subscriptions/?format=json)
+3. views refactoring:
 
-3. views refactoring::
+   ```text
+   Смысл prefetch_related - для всех подписок вытащить одним разом всех клиентов
+   При получении каждой подписки мы должны вытащить Client чтоб у него потом взять company_name, email - это то же самое,
+   но еще глубже Client -> user -> email
+   
+   `.prefetch_related('client').prefetch_related('client__user')` - при таком запросе мы решаем проблему
+   N+1, но мы достаем все поля, а нам надо только необходимые. Для этого воспользуемся классом Prefetch.
+   И в классе Prefetch мы можем указать конкретные поля (only('company_name', 'user__email')) из конкретной модели ('client'). 
+   ```
+
    ```
    services -> views.py 
    
