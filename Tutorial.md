@@ -11,6 +11,7 @@ Create requirements.txt, .gitignore, Tutorial.md, .env
 5. Create app <a href="#services">services</a>
 6. ORM query <a href="#optimization">optimization</a>
 7. Annotate and Aggregate in <a href="#orm">ORM</a>
+8. <a href="#celery">Celery</a>
 
 ---
 
@@ -344,8 +345,8 @@ docker-compose up
 
    ```text
    Смысл prefetch_related - для всех подписок вытащить одним разом всех клиентов
-   При получении каждой подписки мы должны вытащить Client чтоб у него потом взять company_name, email - это то же самое,
-   но еще глубже Client -> user -> email
+   При получении каждой подписки мы должны вытащить Client чтоб у него потом взять company_name.  
+   email - это то же самое, но еще глубже Client -> user -> email
    
    `.prefetch_related('client').prefetch_related('client__user')` - при таком запросе мы решаем проблему
    N+1, но мы достаем все поля, а нам надо только необходимые. Для этого воспользуемся классом Prefetch.
@@ -479,7 +480,7 @@ docker-compose up
 
 2. Annotate:
 
-   annotate - каждую из выдаваемых subscription он бедет чем-то дополнять, как-то анотировать.
+   annotate - каждую из выдаваемых subscription он будет чем-то дополнять, как-то анотировать.
    Добавиться вируальное поле price.
 
    ```
@@ -602,6 +603,8 @@ docker-compose up
    "queryset.aggregate(total=Sum('price')).get('total')" сработал, так как мы в annotate создали виртуальное
    поле price.
 
+   В функции list(self, request, *args, **kwargs) обрабатывается запрос и формируется ответ нашему клиенту
+
    ```
    services -> views.py 
    
@@ -668,6 +671,81 @@ docker-compose up
 
    ```
    docker-compose run --rm web-app sh -c "python manage.py test"
+   ```
+
+---
+
+### 8. Celery: <a name="celery"></a>
+
+1. docker-compose.yml refactoring:
+
+   ```dockerfile
+   services:
+      web-app:
+      ....
+      
+      redis:
+       image: redis:7.0.5-alpine
+       hostname: redis
+      
+      worker:
+       build:
+         context: .
+       hostname: worker
+       entrypoint: celery
+       command: -A celery_app.app worker --loglevel=info
+       volumes:
+         - ./service:/service
+       links:
+         - redis
+       depends_on:
+         - redis
+   
+   ```
+
+2. Create celery_app.py
+3. Create __init__.py:
+   ```python
+   from .celery_app import app as celery_app
+   
+   __all__ = ('celery_app',)
+   
+   ```
+4. settings.py refactoring:
+   ```
+   service -> settings.py
+   
+   ....
+   
+   CELERY_BROKER_URL = 'redis://redis:6379/0'
+   ```
+
+5. Run
+   ```
+   cd PycharmProjects/Django_optimization/service_app
+   ```
+
+   ```
+   docker-compose build
+   ```
+
+   ```
+   docker-compose up
+   ```
+
+6. Test
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py shell"
+   ```
+
+   ```pycon
+   >>> from celery_app import debug_task
+   >>> debug_task()
+   Hello form debug_task
+   
+   >>> debug_task.delay()
+   <AsyncResult: 2cbc3698-be65-4edb-8a57-93fabb880dd9>
+   
    ```
 
 <a href="#top">UP</a>
