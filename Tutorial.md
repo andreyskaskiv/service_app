@@ -748,4 +748,38 @@ docker-compose up
    
    ```
 
+7. docker-compose.yml refactoring:
+
+   ```dockerfile
+   services:
+      web-app:
+      ....
+      
+      flower:
+          build:
+            context: .
+          hostname: flower
+          entrypoint: celery
+          command: -A celery_app.app flower
+          volumes:
+            - ./service:/service
+          links:
+            - redis
+          depends_on:
+            - redis
+          ports:
+            - "5555:5555"
+   
+   ```
+
+   ```
+   docker-compose build
+   ```
+
+   ```
+   docker-compose up
+   ```
+
+   [flower](http://127.0.0.1:5555/)
+
 <a href="#top">UP</a>
