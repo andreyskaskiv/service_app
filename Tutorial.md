@@ -12,6 +12,7 @@ Create requirements.txt, .gitignore, Tutorial.md, .env
 6. ORM query <a href="#optimization">optimization</a>
 7. Annotate and Aggregate in <a href="#orm">ORM</a>
 8. <a href="#celery">Celery</a>
+9. Create celery <a href="#tasks">tasks</a>
 
 ---
 
@@ -791,5 +792,135 @@ docker-compose up
    ```
 
    [flower](http://127.0.0.1:5555/)
+
+---
+
+### 9. Create celery tasks: <a name="tasks"></a>
+
+1. Run:
+   ```
+   cd PycharmProjects/Django_optimization/service_app
+   ```
+   ```
+   docker-compose up
+   ```
+   New Tab:
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py test"
+   ```
+
+   [&#8658; flower ](http://127.0.0.1:5555/)  
+   [&#8658; json ](http://127.0.0.1:8000/api/subscriptions/?format=json)
+
+2. views refactoring:
+
+   delete annotate
+
+   ```
+   services -> views.py 
+   
+   class SubscriptionView(ReadOnlyModelViewSet):
+      queryset = Subscription.objects.all().prefetch_related(
+        'plan',
+        Prefetch('client',
+                 queryset=Client.objects.all().select_related('user').only('company_name',
+                                                                           'user__email'))
+      )
+      serializer_class = SubscriptionSerializer
+   ```
+
+3. models refactoring:
+   ```
+   services -> models.py
+
+   class Subscription(models.Model):
+      ...
+   
+      price = models.PositiveIntegerField(default=0)
+   ...
+
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py makemigrations"
+   docker-compose run --rm web-app sh -c "python manage.py migrate"
+   ``` 
+
+4. Create tasks.py
+   ```
+   services -> tasks.py
+
+   @shared_task
+   def set_price(subscription_id):
+      ...
+   
+   ```
+
+5. models refactoring:
+   ```
+   services -> models.py
+   
+   class Service(models.Model):
+   
+      ...
+   
+       def __init__(self, *args, **kwargs):
+           super().__init__(*args, **kwargs)
+           self.__full_price = self.full_price
+   
+       def save(self, *args, **kwargs):
+   
+           if self.full_price != self.__full_price:
+               for subscription in self.subscriptions.all():
+                   set_price.delay(subscription.id)
+   
+           return super().save(*args, **kwargs)
+   ```
+
+   ```
+   services -> models.py
+   
+   class Plan(models.Model):
+   
+      ...
+   
+       def __init__(self, *args, **kwargs):
+           super().__init__(*args, **kwargs)
+           self.__full_price = self.full_price
+   
+       def save(self, *args, **kwargs):
+   
+           if self.full_price != self.__full_price:
+               for subscription in self.subscriptions.all():
+                   set_price.delay(subscription.id)
+   
+           return super().save(*args, **kwargs)
+   ```
+
+6. Added celery_singleton:
+
+   ```
+   services -> tasks.py
+
+   @shared_task(base=Singleton)
+   def set_price(subscription_id):
+      ...
+   
+   ```
+
+   ```
+   docker-compose build
+   ```
+
+   ```
+   docker-compose up
+   ```
+7. test_api refactoring:   
+   delete annotate and added "price=0"
+
+8. test_serializers refactoring:   
+   delete annotate and added "price=0"
+
+   ```text
+   Решить проблему с пересчетом price в тестах.
+   ```
 
 <a href="#top">UP</a>

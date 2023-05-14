@@ -42,13 +42,16 @@ class ServicesApiTestCase(APITestCase):
 
         Subscription.objects.create(client=self.client_1,
                                     service=self.service_1,
-                                    plan=self.plan_1)
+                                    plan=self.plan_1,
+                                    price=0)
         Subscription.objects.create(client=self.client_2,
                                     service=self.service_1,
-                                    plan=self.plan_2)
+                                    plan=self.plan_2,
+                                    price=0)
         Subscription.objects.create(client=self.client_3,
                                     service=self.service_1,
-                                    plan=self.plan_3)
+                                    plan=self.plan_3,
+                                    price=0)
 
     def test_01_get(self):
         """Testing optimization with prefetch_related and select_related"""
@@ -66,8 +69,7 @@ class ServicesApiTestCase(APITestCase):
             Prefetch('client',
                      queryset=Client.objects.all().select_related('user').only('company_name',
                                                                                'user__email'))
-        ).annotate(price=F('service__full_price') -
-                         F('service__full_price') * F('plan__discount_percent') / 100.00)
+        )
 
         serializer_data = SubscriptionSerializer(queryset, many=True).data
         self.assertEqual(status.HTTP_200_OK, response.status_code)

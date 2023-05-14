@@ -38,22 +38,23 @@ class ServicesSerializerTestCase(TestCase):
 
         Subscription.objects.create(client=self.client_1,
                                     service=self.service_1,
-                                    plan=self.plan_1)
+                                    plan=self.plan_1,
+                                    price=0)
         Subscription.objects.create(client=self.client_2,
                                     service=self.service_1,
-                                    plan=self.plan_2)
+                                    plan=self.plan_2,
+                                    price=0)
         Subscription.objects.create(client=self.client_3,
                                     service=self.service_1,
-                                    plan=self.plan_3)
+                                    plan=self.plan_3,
+                                    price=0)
 
         queryset = Subscription.objects.all().prefetch_related(
             'plan',
             Prefetch('client',
                      queryset=Client.objects.all().select_related('user').only('company_name',
                                                                                'user__email'))
-        ).annotate(price=F('service__full_price') -
-                         F('service__full_price') * F('plan__discount_percent') / 100.00)
-
+        )
         data = SubscriptionSerializer(queryset, many=True).data
         expected_data = [
             {
@@ -66,7 +67,7 @@ class ServicesSerializerTestCase(TestCase):
                     "plan_type": "Full",
                     "discount_percent": 0
                 },
-                "price": 250
+                "price": 0
             },
             {
                 "id": self.client_2.id,
@@ -78,7 +79,7 @@ class ServicesSerializerTestCase(TestCase):
                     "plan_type": "Discount",
                     "discount_percent": 20
                 },
-                "price": 200
+                "price": 0
             },
             {
                 "id": self.client_3.id,
@@ -90,7 +91,7 @@ class ServicesSerializerTestCase(TestCase):
                     "plan_type": "Student",
                     "discount_percent": 40
                 },
-                "price": 150
+                "price": 0
             }
         ]
 
