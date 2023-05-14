@@ -678,6 +678,7 @@ docker-compose up
 ### 8. Celery: <a name="celery"></a>
 
 1. docker-compose.yml refactoring:
+   fix bag:
 
    ```dockerfile
    services:
@@ -700,11 +701,20 @@ docker-compose up
          - redis
        depends_on:
          - redis
+         - database
+       environment:
+         - DB_HOST=database
+         - DB_NAME=dbname
+         - DB_USER=dbuser
+         - DB_PASS=pass
    
-   ```
+      ```
 
 2. Create celery_app.py
 3. Create __init__.py:
+   fix bag:
+   Path: service/service/__init__.py
+
    ```python
    from .celery_app import app as celery_app
    
