@@ -13,6 +13,7 @@ Create requirements.txt, .gitignore, Tutorial.md, .env
 7. Annotate and Aggregate in <a href="#orm">ORM</a>
 8. <a href="#celery">Celery</a>
 9. Create celery <a href="#tasks">tasks</a>
+10. Create celery <a href="#worker">worker2</a>
 
 ---
 
@@ -922,5 +923,129 @@ docker-compose up
    ```text
    Решить проблему с пересчетом price в тестах.
    ```
+
+---
+
+### 10. Create celery worker2: <a name="worker2"></a>
+
+1. docker-compose.yml refactoring:
+
+   ```dockerfile
+   services:
+      web-app:
+      ....
+   
+     worker2:
+       build:
+         context: .
+       hostname: worker2
+       entrypoint: celery
+       command: -A celery_app.app worker --loglevel=info
+       volumes:
+         - ./service:/service
+       links:
+         - redis
+       depends_on:
+         - redis
+         - database
+       environment:
+         - DB_HOST=database
+         - DB_NAME=dbname
+         - DB_USER=dbuser
+         - DB_PASS=pass
+      
+   ```
+   ```
+   cd PycharmProjects/Django_optimization/service_app
+   ```
+   ```
+   docker-compose build
+   ```
+
+   ```
+   docker-compose up
+   ```
+
+2. models refactoring:
+
+   ```text
+   Let's create another minor field in the model
+   ```
+   ```
+   services -> models.py
+
+   class Subscription(models.Model):
+      ...
+   
+      comment = models.CharField(max_length=50, default='')
+   ```
+
+   ```
+   services -> models.py
+
+   class Service(models.Model):
+      ...
+   
+       def save(self, *args, **kwargs):
+
+            if self.full_price != self.full_price:
+                for subscription in self.subscriptions.all():
+                    ...
+   
+                    set_comment.delay(subscription.id)
+
+            return super().save(*args, **kwargs)
+   ```
+   ```
+   services -> models.py
+
+   class Plan(models.Model):
+      ...
+   
+       def save(self, *args, **kwargs):
+
+            if self.discount_percent != self.__discount_percent:
+                for subscription in self.subscriptions.all():
+                    ...
+   
+                    set_comment.delay(subscription.id)
+
+            return super().save(*args, **kwargs)
+   ```
+
+3. refactoring tasks.py
+   ```
+   services -> tasks.py
+
+   @shared_task(base=Singleton)
+   def set_comment(subscription_id):
+      ...
+   
+   ```
+   ```text
+   with transaction.atomic():
+   transaction - Это процедура в базе, которая будет происходит атомарно, то есть либо код выполнится
+   полностью (все пункты), либо все это вместе не случится. Или все вместе, или не как. 
+   atomic - означает, что это не может быть применено частично. 
+   ```
+   ```text
+   Внутрь транзакции необходимо включать только такой код, который лочится внутри этой транзакции. После этого мы сразу 
+   должны выходить из этой транзакции, чтоб дальнейший код мог отрабатывать параллельно. 
+   ```
+
+   ```
+   services -> tasks.py
+
+   @shared_task(base=Singleton)
+   def set_price(subscription_id):
+      ...
+      with transaction.atomic():
+      ....
+   
+   ```
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py makemigrations"
+   docker-compose run --rm web-app sh -c "python manage.py migrate"
+   ``` 
 
 <a href="#top">UP</a>
