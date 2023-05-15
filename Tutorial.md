@@ -15,6 +15,7 @@ Create requirements.txt, .gitignore, Tutorial.md, .env
 9. Create celery <a href="#tasks">tasks</a>
 10. Create celery <a href="#worker">worker2</a>
 11. <a href="#rediscache">RedisCache</a>
+12. PostgreSQL <a href="#indexing">indexing</a> in Django
 
 ---
 
@@ -1169,6 +1170,139 @@ docker-compose up
 
    post_delete.connect(delete_cache_total_sum, sender=Subscription)
 
+   ```
+
+---
+
+### 12. PostgreSQL indexing in Django: <a name="indexing"></a>
+
+[Advanced PostgreSQL indexing tips in Django](https://idego-group.com/advanced-postgresql-indexing-tips-in-django/)
+
+1. B-tree index
+
+   ```text
+   По умолчанию PostgreSQL предоставляет нам очень простой, но эффективный тип индекса — B-tree index.
+   Этот тип индекса является наиболее распространенным в использовании. Он достигает своей цели, 
+   создавая древовидную структуру блоков, содержащих ключевые значения в порядке возрастания. 
+   Каждый из этих блоков ссылается на два других дочерних блока, где левые ключи сохраняют значение меньше, 
+   чем текущие ключи, а правые — больше, чем текущие ключи. Таким образом, поиск значений внутри индекса 
+   сводится к простым сравнительным вычислениям. B-дерево также может обрабатывать запросы на равенство и 
+   диапазон для данных, которые можно отсортировать в порядке.
+   ```
+
+   ```
+   cd PycharmProjects/Django_optimization/service_app
+   ```
+
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py shell"
+   ```
+
+   ```pycon
+   >>> from services.models import Subscription
+   >>> Subscription.objects.filter(comment="123")
+   (0.013) SELECT "services_subscription"."id", "services_subscription"."client_id", "services_subscription"."service_id", "services_subscription"."plan_id", "services_subscription"."price", "services_subscription"."comment" FROM "services_subscription" WHERE "services_subscription"."comment" = '123' LIMIT 21; args=('123',)
+   <QuerySet []>
+   >>> Subscription.objects.filter(comment="123").explain(analyze=True)
+   (0.002) EXPLAIN (ANALYZE true) SELECT "services_subscription"."id", "services_subscription"."client_id", "services_subscription"."service_id", "services_subscription"."plan_id", "services_subscription"."price", "services_subscription"."comment" FROM "services_subscription" WHERE "services_subscription"."comment" = '123'; args=('123',)
+   "Seq Scan on services_subscription  (cost=0.00..15.50 rows=2 width=154) (actual time=0.030..0.030 rows=0 loops=1)\n  Filter: ((comment)::text = '123'::text)\n  Rows Removed by Filter: 2\nPlanning Time: 0.131 ms\nExecution Time: 0.089 ms"
+   
+   ```
+
+   ```textmate
+   Понятно, что PostgreSQL «решил» использовать Seq Scan (sequential scan - последовательное сканирование) для извлечения
+   элемента, что просто означает, что ему нужно было просмотреть все строки таблицы, чтобы завершить свое действие. 
+   Эта практика оказывает явное влияние на стоимость времени выполнения. 
+   Поэтому, чтобы повысить производительность API, мы должны использовать index в поле. Благодаря Django мы можем 
+   внести это изменение прямо в нашу модель , применив его db_index=True в нужном поле. 
+   После запуска миграции базы данных и повторной отправки запроса.
+   ```
+
+2. models refactoring:
+
+   ```
+   services -> models.py
+   
+   
+   class Subscription(models.Model):
+       
+       comment = models.CharField(max_length=50, default='', db_index=True)
+   ```
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py makemigrations"
+   docker-compose run --rm web-app sh -c "python manage.py migrate"
+   ``` 
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py shell"
+   ```
+   ```pycon
+   >>> from services.models import Subscription
+   >>> Subscription.objects.filter(comment="123").explain(analyze=True)
+   (0.014) EXPLAIN (ANALYZE true) SELECT "services_subscription"."id", "services_subscription"."client_id", "services_subscription"."service_id", "services_subscription"."plan_id", "services_subscription"."price", "services_subscription"."comment" FROM "services_subscription" WHERE "services_subscription"."comment" = '123'; args=('123',)
+   "Seq Scan on services_subscription  (cost=0.00..1.02 rows=1 width=154) (actual time=0.025..0.025 rows=0 loops=1)\n  Filter: ((comment)::text = '123'::text)\n  Rows Removed by Filter: 2\nPlanning Time: 4.267 ms\nExecution Time: 0.144 ms"
+   ```
+   ```textmate
+   У нас все еще не применился index scan 
+   ```
+   ```python
+   for i in range(1, 301):
+      Subscription.objects.create(client_id=1, plan_id=1, service_id=1, comment=str(i))
+   ```
+   ```pycon
+   Subscription.objects.filter(comment="123").explain(analyze=True)
+   (0.002) EXPLAIN (ANALYZE true) SELECT "services_subscription"."id", "services_subscription"."client_id", "services_subscription"."service_id", "services_subscription"."plan_id", "services_subscription"."price", "services_subscription"."comment" FROM "services_subscription" WHERE "services_subscription"."comment" = '123'; args=('123',)
+   "Index Scan using services_subscription_comment_e751ca44_like on services_subscription  (cost=0.15..8.17 rows=1 width=39) (actual time=0.104..0.108 rows=1 loops=1)\n  Index Cond: ((comment)::text = '123'::text)\nPlanning Time: 1.152 ms\nExecution Time: 0.184 ms"
+   ```
+   ```textmate
+   На этот раз ядро базы данных использовало Index Scan для индекса, автоматически созданного PostgreSQL. 
+   Это означает, что сканирование последовательности не выполнялось , так как механизм выполнял поиск в дереве индексов,
+   предоставляя определенное db_index=True. Индексация увеличивает объем базы данных, так что добовлять его
+   на все поля нет необходимости. Лучше добовлять на те, по которым вы ищете. 
+   ```
+3. Создание составного индекса для поиска по двум полям одновременно:
+
+   ```python
+   services -> models.py
+   
+   
+   class Subscription(models.Model):
+       ...  
+   
+      field_a = models.CharField(max_length=50, default='')
+      field_b = models.CharField(max_length=50, default='')
+      
+      class Meta:
+        indexes = [
+            models.Index(fields=['field_a', 'field_b'])
+        ]
+   ```
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py makemigrations"
+   docker-compose run --rm web-app sh -c "python manage.py migrate"
+   ``` 
+   ```
+   docker-compose run --rm web-app sh -c "python manage.py shell"
+   ```
+   `Index Scan`
+   ```pycon
+   >>> from services.models import Subscription
+   >>> Subscription.objects.filter(field_a="12", field_b="13").explain(analyze=True)
+   (0.016) EXPLAIN (ANALYZE true) SELECT "services_subscription"."id", "services_subscription"."client_id", "services_subscription"."service_id", "services_subscription"."plan_id", "services_subscription"."price", "services_subscription"."comment", "services_subscription"."field_a", "services_subscription"."field_b" FROM "services_subscription" WHERE ("services_subscription"."field_a" = '12' AND "services_subscription"."field_b" = '13'); args=('12', '13')
+   "Index Scan using services_su_field_a_155836_idx on services_subscription  (cost=0.15..8.17 rows=1 width=275) (actual time=0.101..0.101 rows=0 loops=1)\n  Index Cond: (((field_a)::text = '12'::text) AND ((field_b)::text = '13'::text))\nPlanning Time: 4.719 ms\nExecution Time: 0.258 ms"
+   ```
+   `Bitmap Heap Scan` or `Seq Scan`
+   ```pycon
+   Subscription.objects.filter(field_a="12").explain(analyze=True)
+   (0.002) EXPLAIN (ANALYZE true) SELECT "services_subscription"."id", "services_subscription"."client_id", "services_subscription"."service_id", "services_subscription"."plan_id", "services_subscription"."price", "services_subscription"."comment", "services_subscription"."field_a", "services_subscription"."field_b" FROM "services_subscription" WHERE "services_subscription"."field_a" = '12'; args=('12',)
+   "Bitmap Heap Scan on services_subscription  (cost=4.16..8.39 rows=2 width=275) (actual time=0.019..0.020 rows=0 loops=1)\n  Recheck Cond: ((field_a)::text = '12'::text)\n  ->  Bitmap Index Scan on services_su_field_a_155836_idx  (cost=0.00..4.16 rows=2 width=0) (actual time=0.016..0.017 rows=0 loops=1)\n        Index Cond: ((field_a)::text = '12'::text)\nPlanning Time: 0.161 ms\nExecution Time: 0.175 ms"
+   ```
+4. Выводы:
+
+   ```textmate
+   Индексы стоит использовать только там, где вы собираетесь искать.
+   Индексы замедляют апдейты
+   Индексы, создавая дополнительные структуры в базе, утяжеляют её.
+   Индексы бывают частичные, например отсекать записи со значениями Null
    ```
 
 <a href="#top">UP</a>
