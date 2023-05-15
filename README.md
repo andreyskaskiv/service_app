@@ -6,6 +6,7 @@
 - Postgres
 - Celery
 - Redis
+- Django-cachalot
 
 Run:
 
