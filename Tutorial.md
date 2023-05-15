@@ -16,6 +16,7 @@ Create requirements.txt, .gitignore, Tutorial.md, .env
 10. Create celery <a href="#worker">worker2</a>
 11. <a href="#rediscache">RedisCache</a>
 12. PostgreSQL <a href="#indexing">indexing</a> in Django
+13. Global caching,  <a href="#cachalot">django-cachalot</a>
 
 ---
 
@@ -1303,6 +1304,33 @@ docker-compose up
    Индексы замедляют апдейты
    Индексы, создавая дополнительные структуры в базе, утяжеляют её.
    Индексы бывают частичные, например отсекать записи со значениями Null
+   ```
+
+---
+
+### 13. Global caching, django-cachalot: <a name="cachalot"></a>
+
+- [Django Packages](https://djangopackages.org/grids/g/caching/)
+- [DJANGO-CACHALOT](https://github.com/noripyt/django-cachalot)
+- [Comparison with similar tools](https://django-cachalot.readthedocs.io/en/latest/introduction.html#comparison-with-similar-tools)
+- [Cache detailed results](https://django-cachalot.readthedocs.io/en/latest/benchmark.html#cache-detailed-results)
+
+1. Registration app
+   ```
+   service -> settings.py
+   
+   INSTALLED_APPS = [
+      ....
+    'cachalot',
+      ....
+   ]
+   ```
+
+   ```
+   docker-compose build
+   ```
+   ```
+   docker-compose up
    ```
 
 <a href="#top">UP</a>
