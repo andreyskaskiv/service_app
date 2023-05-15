@@ -1,4 +1,4 @@
-# service_app
+# service_app, Django optimization
 
 - Django
 - djangorestframework
