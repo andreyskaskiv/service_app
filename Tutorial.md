@@ -14,6 +14,7 @@ Create requirements.txt, .gitignore, Tutorial.md, .env
 8. <a href="#celery">Celery</a>
 9. Create celery <a href="#tasks">tasks</a>
 10. Create celery <a href="#worker">worker2</a>
+11. <a href="#rediscache">RedisCache</a>
 
 ---
 
@@ -1065,6 +1066,109 @@ docker-compose up
             set_price.delay(self.id)
          return result
    
+   ```
+
+---
+
+### 11. RedisCache: <a name="rediscache"></a>
+
+1. settings.py refactoring:
+   ```
+   service -> settings.py
+   
+   ...
+   
+   CACHES = {
+       'default': {
+           'BACKEND': "django_redis.cache.RedisCache",
+           'LOCATION': 'redis://redis:6379/1',
+       }
+   }
+   
+   PRICE_CACHE_NAME = 'price_cache'
+   ```
+
+2. views.py refactoring:
+   ```
+   services -> views.py
+   
+   class SubscriptionView(ReadOnlyModelViewSet):
+       
+       def list(self, request, *args, **kwargs):
+            ...
+           price_cache = cache.get(settings.PRICE_CACHE_NAME)
+   
+           if price_cache:
+               total_price = price_cache
+           else:
+               total_price = queryset.aggregate(total=Sum('price')).get('total')
+               cache.set(settings.PRICE_CACHE_NAME, total_price, 60 * 60)
+   
+           ...
+           response_data['total_amount'] = total_price
+           ...
+   
+           return response
+   ```
+
+3. Run
+   ```
+   cd PycharmProjects/Django_optimization/service_app
+   ```
+
+   ```
+   docker-compose build
+   ```
+
+   ```
+   docker-compose up
+   ```
+
+4. Manual cache invalidation, tasks.py refactoring:
+
+   ```
+   services -> tasks.py
+   
+   @shared_task(base=Singleton)
+   def set_price(subscription_id):
+       ...
+   
+       with transaction.atomic():
+           ...
+   
+       cache.delete(settings.PRICE_CACHE_NAME)
+   
+   
+   @shared_task(base=Singleton)
+   def set_comment(subscription_id):
+       ...
+   
+       with transaction.atomic():
+           ...
+   
+       cache.delete(settings.PRICE_CACHE_NAME)
+   
+   ```
+
+5. Create receivers.py
+
+   ```
+   services -> receivers.py
+   
+   
+   @receiver(post_delete, sender=None)
+   def delete_cache_total_sum(*args, **kwargs):
+       cache.delete(settings.PRICE_CACHE_NAME)
+   
+   ```
+
+6. models refactoring:
+
+   ```
+   services -> models.py
+
+   post_delete.connect(delete_cache_total_sum, sender=Subscription)
+
    ```
 
 <a href="#top">UP</a>
