@@ -1048,4 +1048,23 @@ docker-compose up
    docker-compose run --rm web-app sh -c "python manage.py migrate"
    ``` 
 
+4. Fix bug save price in models Subscription:
+
+   ```text
+   creating = not bool(self.id) - проверяем, что модель создается в первый раз
+   ```
+   ```
+   services -> models.py
+   
+   class Subscription(models.Model):
+      ...
+      def save(self, *args, **kwargs):
+         creating = not bool(self.id)
+         result = super().save(*args, **kwargs)
+         if creating:
+            set_price.delay(self.id)
+         return result
+   
+   ```
+
 <a href="#top">UP</a>
